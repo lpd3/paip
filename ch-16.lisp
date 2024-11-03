@@ -338,14 +338,145 @@ context cannot be used in the same operation.
     (put-db (context-name context) instance)
     (put-db 'current-instance instance)))
                           
-#| Backward-chaining Revisited |#
-                            
-                   
-        
-    
+#| Backward-chaining Revisited
 
+Backward-chaining in Mycin is similar to backward-chaining
+in Prolog. The main difference is the Mycin certainty
+factors. These require that all relevant facts be gathered
+before evaluating the goal.
 
+Prolog can search depth-first. Mycin must search
+breadth-first.
 
+The functions below will be called in the following
+order:
 
-                                                    
+find-out: To find a parameter for an instance
+  get-db: See if it is cached.
+  ask-vals: Query the user
+  use-rules: See if a known rule can supply the answer
+    reject-premise: Try to disprove premise
+    satisfy-premise: See if each condition is met
+      eval-condition: Evaluate each condition
+        find-out: By finding the parameter's values.
+|#
+
+(defstruct (rule (:print-function print-rule))
+  number
+  premises
+  conclusion
+  cf)
+
+(let ((rules (make-hash-table)))
+  (defun put-rule (rule)
+    "Put the rule in a table, indexed under each
+    rule in the table"
+    (dolist (concl (rule-conclusions rule))
+      (push rule (get-hash (first concl) rules)))
+    rule)
+  
+  (defun get-rules (parm)
+    "A list of rules that help determine this parameter."
+    (gethash parm rules))
+
+  (defun clear-rules () (clrhash rules)))
+
+(defun find-out (parm &optional (inst (get-db 'current-instance)))
+  "Find the value(s) of this parameter for this instance,
+   unless the values are already known.
+   Some parameters we ask first, others we use rules 
+   first."
+  (or (get-db `(known ,parm ,inst))
+      (put-db `(known ,parm ,inst)
+	      (if (parm-ask-first (get-parm parm))
+		  (or (ask-vals parm inst) (use-rules parm))
+		  (or (use-rules parm) (ask-vals parm inst))))))
+
+(defun use-rules (parm)
+  "Try every rule associated with this parameter.
+  Return true if one of the rules returns true."
+  (some #'true-p (mapcar #'use-rule (get-rules parm))))
+
+(defun use-rule (rule)
+  "Apply a rule to the current situation."
+  ;; Keep track of the rule for the explanation system:
+  (put-db 'current-rule rule)
+  ;; If any premise is known false, give up.
+  ;; If every premise can be proved true, then
+  ;; draw conclusions (weighted by the certainty factor)
+  (unless (some #'reject-premise (rule-premises rule))
+    (let ((cf (satisfy-premises (rule-premises rule) true)))
+      (when (true-p cf)
+	(dolist (conclusion (rule-conclusions rule))
+	  (conclude conclusion (* cf (rule-cf rule))))
+	cf))))
+
+(defun satisfy-premises (premises cf-so-far)
+  "A list of premises is satisfied if they are all true.
+  A combined cf is returned."
+  ;; cf-so-far is an accumulator of certainty factors.
+  (cond ((null premises) cf-so-far)
+	((not (true-p cf-so-far)) false)
+	(t (satisfy-premises
+	    (rest premises)
+	    (cf-and cf-so-far
+		    (eval-condition (firsr premises)))))))
+
+(defun eval-condition (condition &optional (find-out-p t))
+  "See if this condition is true, optionally using FIND-OUT
+  to determine unknown parameters."
+  (multiple-value-bind (parm inst op val)
+      (parse-condition condition)
+    (when find-out-p
+      (find-out parm inst))
+    ;; Add up all the (val cf) pairs that satisfy the test
+    (loop for pairs in (get-vals parm inst)
+	  when (funcall op (first pair) val)
+	    sum (second pair))))
+
+(defun reject-premise (premise)
+  "A premise is rejected if it is known false, without
+  needing to call find-out recursively."
+  (false-p (eval-condition premise nil)))
+
+(defun conclude (conclusion cf)
+  "Add conclusion (with specified cf) to DB."
+  (multiple-value-bind (parm inst op val)
+      (parse-condition conclusion)
+    (update-cf parm inst val cf)))
+
+(defun is (a b) (equal a b))
+
+(defun parse-condition (condition)
+  "A condition is of the form (parm inst op val).
+  So for (age patient is 21), we would return 4 values:
+  'age', 'patient-1', 'is' and '21', where patient-1
+  is the current patient."
+  (values
+   (first condition)
+   (get-db (second condition))
+   (third condition)
+   (fourth condition)))
+
+(defun emycin (contexts)
+  "An Expert-System Shell. Accumulate data for instances of each
+  context, and solve for goals. Then report the findings."
+  (clear-db)
+  (get-context-data contexts))
+
+(defun get-context-data (contexts)
+  "For each context, create an instance and try to find out
+  required data. Then go on to other contexts, depth-first,
+  and finally, ask if there are other instances of this context."
+  (unless (null contexts)
+    (let* ((context (first contexts))
+	   (inst (new-instance context)))
+      (put-db 'current-rule 'initial)
+      (mapc #'find-out (context-goals context))
+      (report-findings context inst)
+      (get-context-data (rest contexts))
+      (when (y-or-n-p "Is there another ~a?"
+		      (context-name context))
+	(get-context-data contexts)))))
+
 
