@@ -359,7 +359,7 @@
    :index
    :lookup
    :lookup-atom
-    make-dtree
+   :make-dtree
    :make-empty-nlist
    :mapc-retrieve
    :match-variable
@@ -451,10 +451,10 @@
   (:import-from :repl-utilities
    :trace-package)
   (:import-from :symbolic
-     exp-args
-     exp-op
-     expp
-     length=1)
+     :exp-args
+     :exp-op
+     :expp
+     :length=1)
   (:import-from :alexandria
      :mappend)
   (:import-from :general-problem-solver

@@ -176,7 +176,7 @@ can not be found by means of the rule-base
                 parm 
                 inst)))
         (case ans
-          (help (format help-string))
+          (help (format t help-string))
           (why 
             (print-why 
               (get-db 'current-rule) parm))
@@ -478,5 +478,208 @@ find-out: To find a parameter for an instance
       (when (y-or-n-p "Is there another ~a?"
 		      (context-name context))
 	(get-context-data contexts)))))
+
+;;; Interacting with the expert
+
+(defmacro defrule (number &body body)
+  "Define a rule with conditions, a certainty factor, and
+conclusions. Example: (defrule R001 if ... then .9 ...)"
+  (assert (equal (first body 'if)))
+  (let* ((then-part (member 'then body))
+	 (premises (ldiff (rest body) then-part))
+	 (conclusions (rest2 then-part))
+	 (cf (second then-part)))
+    ;; Do some error-checking
+    (check-conditions number premises 'premise)
+    (check-conditions number conclusions 'conclusion)
+    (when (not (cf-p cf))
+      (warn "Rule ~A: Illegal certainty factor: ~A" number cf))
+    ;; Now build the rule:
+    `(put-rule
+      (make-rule :number ',number :cf ,cf :premises ',premises
+		 :conclusions ',conclusions))))
+
+(defun check-conditions (rule-num conditions kind)
+  "Warn if any conditions are invalid."
+  (when (null conditions)
+    (warn "Rule ~A: Missing ~A" rule-num kind))
+  (dolist (condition conditions)
+    (when (not (consp condition))
+      (warn "Rule ~A: Illegal ~A: ~A" rule-num kind condition))
+    (multiple-value-bind (parm inst op val)
+	(parse-condition condition)
+      (declare (ignore inst))
+      (when (and (eq kind 'conclusion) (not (eq op 'is)))
+	(warn "Rule ~A: Illegal operator (~A) in conclusion: ~A"
+	      rule-num op cindition))
+      (when (not (typep val (parm-type parm)))
+	(warn "Rule ~A: Illegal value (~A) in ~A: ~A"
+	      rule-num val kind condition)))))
+
+;;; Interacting with the client
+
+(defun report-findings (context inst)
+  "Print findings on each goal for this instance"
+  (when (context-goals context)
+    (format t "~&Findings for ~A:" (inst-name inst))
+    (dolist (goal (context-goals context))
+      (let ((values (get-vals goal inst)))
+	;; If there are any values for this goal,
+	;; print them sorted by certainty-factor
+	(if values
+	    (format t "~& ~A: ~{~{ ~A (~.3F) ~}~}" goal
+		    (sort (copy-list values) #'> :key #'second))
+	    (format t "~& ~A: unknown" goal))))))
+
+(defun print-rule (rule &optional (stream t) depth)
+  (declare (ignore depth))
+  (format stream "~&Rule ~A:~& If" (rule-number rule))
+  (print-conditions (rule-premises rule) stream)
+  (format stream "~&Then ~A (~A) that"
+	  (cf->english (rule-conclusion rule) stream))
+  (print-conditions (rule-conclusion rule) stream))
+
+(defun print-conditions (conditions &optional
+				      (stream t) (num 1))
+  "Print a list of numbered conditions"
+  (dolist (condition conditions)
+    (print-condition condition stream num)))
+
+(defun print-condition (condition stream number)
+  "Print a single condition in pseudo-English"
+  (format stream "~A    ~D)~{ ~A ~}" number
+	  (let ((parm (first condition))
+		(inst (second condition))
+		(op (third condition))
+		(val (fourth condition)))
+	    (case val
+	      (YES `(the ,inst ,op ,parm))
+	      (NO `(the ,inst ,op not ,parm))
+	      (t `(the ,parm of the ,inst ,op ,val))))))
+
+(defun cf->english (cf)
+  "Convert a certainty-factor to an English phrase"
+  (cond ((= cf 1.0) "there is certain evidence")
+	((> cf .8) "there is strongly suggestive evidence")
+	((> cf .5) "there is suggestive evidence")
+	((> cf 0.0) "there is weakly suggestive evidence")
+	((= cf 0.0) "there is NO evidence either way")
+	((< cf 0.0) (concatenate 'string (cf->english (- cf))
+				 " AGAINST the conclusion"))))
+
+(defun print-why (rule parm)
+  "Tell why this rule is being used. Print what is known,
+what we are trying to find out, and what we can conclude."
+  (format t "~&[Why is the value of ~A being asked for?]" parm)
+  (if (member rule '(initial goal))
+      (format t "~&~A is one of the ~A parameters."
+	      parm rule)
+      (multiple-value-bind (knowns unknowns)
+	  (partition-if #'(lambda (premise)
+			    (true-p (eval-condition premise nil)))
+			(rule-premises rule))
+	(when knowns
+	  (format t "~&It is known that:")
+	  (print-conditions knowns)
+	  (format t "~&Therefore,"))
+	(let ((new-rule (copy-rule rule)))
+	  (setf (rule-premises new-rule) unknowns)
+	  (print new-rule)))))
+  
+  
+
+;;; MYCIN: A Medical Expert System
+
+
+(defun mycin ()
+  "Determine what organism is infecting a patient"
+  (emycin (defcontext patient (name sex age) ())
+	  (defcontext culture (site days-old) ())
+	  (defcintext organism () (identity))))
+
+;; Parameters for patients
+
+(defparm name patient t "Patient's name: " t read-line)
+
+(defparm sex patient (member male female) "Sex: "  t)
+
+(defparm age patient number "Age: " t)
+
+(defparm burn patient (member no mild serious)
+  "Is ~A a burn patient? If so, mild or serious?" t)
+
+(defparm compromised-host patient yes/no "Is ~A a compromised host?")
+
+;; Parameters for culture
+
+(defparm site culture (member blood)
+  "From what site was the culture for ~A taken?" t)
+
+(defparm days-old culture number
+  "How many days ago was this culture (~A) obtained?" t)
+
+;; Parameters for organism
+
+(defparm identity organism
+  (member pseudomonas klebsiella enterobacteriaceae
+	  staphylococcus bacteroides streptococcus)
+  "Enter the identity (genus) of ~A" t)
+
+(defparm gram organism (member acid-fast pos neg)
+  "The gram stain of ~A:" t)
+
+(defparm morphology organism (member rod coccus)
+  "Is ~A a rod or coccus (etc.):")
+
+(defparm aerobicity organism (member aerobic anaerobic))
+
+(defparm growth-conformation organism
+  (member chains pairs clumps))
+
+(clear-rules)
+
+(defrule 52
+   if (site culture is blood)
+      (gram organism is neg)
+      (morphology organism is rod)
+      (burn patient is serious)
+  then .4
+  (identity organism is pseudomonas))
+
+(defrule 71
+  if (gram organism is pos)
+     (morphology organism is coccus)
+     (growth-comformation organism is clumps)
+  then .7
+  (identity organism is staphylococcus))
+
+(defrule 73
+  if (site culture is blood)
+     (gram organism is neg)
+     (morphology organism is rod)
+     (aerobicity organism is anaerobic)
+  then .9
+   (identity organism is bacteroides))
+
+(defrule 75
+  if (gram organism is neg)
+     (morphology organism is rod)
+     (compromised-host patient is yes)
+  then .6
+  (identity organism is pseudomonas))
+
+(defrule 107
+  if (gram organism is neg)
+     (morphology organism is rod)
+     (aerobicity organism is aerobic)
+  then .8
+  (identity organism is enterobacteriaceae))
+
+(defrule 165
+  if (gram organism is pos)
+     (morphology organism is coccus)
+     (growth-conformation organism is chains)
+  then .7
+  (identity organism is streptococcus))
 
 

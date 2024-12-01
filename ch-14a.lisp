@@ -334,23 +334,19 @@ chapter.
   desired."
   (if (> depth *depth-incr*)
       +fail+
-      (let* ((bs 
-                (make-broadcast-stream
-                 *query-io*
-                 *standard-output*))
-             (*standard-output* bs))
-        (if (null vars)
+      (progn
+	(if (null vars)
             (format t "~&Yes.")
             (dolist (var vars)
-              (format t "~&~A = ~A" 
-                var
-                (subst-bindings bindings var)))
-            (if (continuep)
-                +fail+
-                (prove-all 
-                  other-goals
-                  bindings
-                  depth))))))
+	      (format t "~&~A = ~A" 
+		      var
+		      (subst-bindings bindings var))))
+        (if (continuep)
+	    +fail+
+	    (prove-all 
+	     other-goals
+	     bindings
+	     depth)))))
                 
 (defun rename-variables (x)
   "Replace all variables in x with new ones."
@@ -416,7 +412,7 @@ chapter.
       
 (eval-when (:compile-toplevel
             :load-toplevel
-            :eval)
+            :execute)
   (defun replace-?-vars (exp)
     "Replace any ? in exp with a var of the
     form #:?123."

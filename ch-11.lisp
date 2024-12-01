@@ -805,7 +805,7 @@ the symbol ? to represent this variable.
  
 (eval-when (:compile-toplevel
             :load-toplevel
-            :eval)
+            :execute)
   (defun replace-?-vars (exp)
     "Replace any ? in exp with a var of the
     form #:?123."

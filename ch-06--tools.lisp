@@ -1202,13 +1202,6 @@ the path.
              old-states 
              :test state=)))
      (funcall successors (first states))))
-
-(defun rm-tmps ()
-  "Remove files whose name contains
-  ``tmp'' from this directory."
-  (qml:shell 
-    "rm quicklisp/local-projects/paip/*tmp*")
-  'ok)
   
 (defun next2 (x)
   "Given a number x, returns the list

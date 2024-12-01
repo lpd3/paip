@@ -1,15 +1,8 @@
 ;;;; paip/paip.asd
-                 
-(eval-when (:load-toplevel)
-  (qml:quicklisp))
+   
+(in-package :asdf-user)
 
-(let ((dependencies '(:alexandria
-                      :repl-utilities)))
-  (dolist (dep dependencies)
-    (when (not (find-package dep))
-      (quicklisp:quickload dep))))
-  
-                 
+
 (defsystem "paip"
   :description "Code from Peter Norvig's
   Paradigms in Artificial Intelligence
