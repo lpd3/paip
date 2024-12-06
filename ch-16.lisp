@@ -255,14 +255,26 @@ can not be found by means of the rule-base
               (first reply) 
               (second reply))
             (parse-reply
-#| rest2 |# (rest2 reply)))))) ;;;; rest2
+             (rest2 reply))))))
+
+
+(eval-when
+    (:compile-toplevel
+     :load-toplevel
+     :execute)
+  
+  (defun rest2 (lst)
+    "Given a list, return a list with the first two items
+in the input removed."
+    (nthcdr 2 lst)))
           
 (defstruct (parm 
       (:constructor
        new-parm 
          (name 
           &optional 
-          context-type-restriction
+          context
+	  type-restriction
           prompt
           ask-first
           reader)))
@@ -322,9 +334,9 @@ context cannot be used in the same operation.
                       goals)
   "Define a context."
   `(make-context
-    :name ,name
-    :initial-data ,initial-data
-    :goals ,goals))
+    :name ',name
+    :initial-data ',initial-data
+    :goals ',goals))
 
 (defun new-instance (context)
   "Creates a new instance of this context."
@@ -364,7 +376,7 @@ find-out: To find a parameter for an instance
 (defstruct (rule (:print-function print-rule))
   number
   premises
-  conclusion
+  conclusions
   cf)
 
 (let ((rules (make-hash-table)))
@@ -372,7 +384,7 @@ find-out: To find a parameter for an instance
     "Put the rule in a table, indexed under each
     rule in the table"
     (dolist (concl (rule-conclusions rule))
-      (push rule (get-hash (first concl) rules)))
+      (push rule (gethash (first concl) rules)))
     rule)
   
   (defun get-rules (parm)
@@ -430,7 +442,7 @@ find-out: To find a parameter for an instance
     (when find-out-p
       (find-out parm inst))
     ;; Add up all the (val cf) pairs that satisfy the test
-    (loop for pairs in (get-vals parm inst)
+    (loop for pair in (get-vals parm inst)
 	  when (funcall op (first pair) val)
 	    sum (second pair))))
 
@@ -482,9 +494,9 @@ find-out: To find a parameter for an instance
 ;;; Interacting with the expert
 
 (defmacro defrule (number &body body)
-  "Define a rule with conditions, a certainty factor, and
-conclusions. Example: (defrule R001 if ... then .9 ...)"
-  (assert (equal (first body 'if)))
+  "Define a rule with conditions, a certainty factor, andc
+conclusions. Example: (defrulR001 if ... then .9 ...)"
+  (assert (equal (first body) 'if))
   (let* ((then-part (member 'then body))
 	 (premises (ldiff (rest body) then-part))
 	 (conclusions (rest2 then-part))
@@ -498,23 +510,26 @@ conclusions. Example: (defrule R001 if ... then .9 ...)"
     `(put-rule
       (make-rule :number ',number :cf ,cf :premises ',premises
 		 :conclusions ',conclusions))))
-
-(defun check-conditions (rule-num conditions kind)
-  "Warn if any conditions are invalid."
-  (when (null conditions)
-    (warn "Rule ~A: Missing ~A" rule-num kind))
-  (dolist (condition conditions)
-    (when (not (consp condition))
-      (warn "Rule ~A: Illegal ~A: ~A" rule-num kind condition))
-    (multiple-value-bind (parm inst op val)
-	(parse-condition condition)
-      (declare (ignore inst))
-      (when (and (eq kind 'conclusion) (not (eq op 'is)))
-	(warn "Rule ~A: Illegal operator (~A) in conclusion: ~A"
-	      rule-num op cindition))
-      (when (not (typep val (parm-type parm)))
-	(warn "Rule ~A: Illegal value (~A) in ~A: ~A"
-	      rule-num val kind condition)))))
+(eval-when
+    (:compile-toplevel
+     :load-toplevel
+     :execute)
+  (defun check-conditions (rule-num conditions kind)
+    "Warn if any conditions are invalid."
+    (when (null conditions)
+      (warn "Rule ~A: Missing ~A" rule-num kind))
+    (dolist (condition conditions)
+      (when (not (consp condition))
+	(warn "Rule ~A: Illegal ~A: ~A" rule-num kind condition))
+      (multiple-value-bind (parm inst op val)
+	  (parse-condition condition)
+	(declare (ignore inst))
+	(when (and (eq kind 'conclusion) (not (eq op 'is)))
+	  (warn "Rule ~A: Illegal operator (~A) in conclusion: ~A"
+		rule-num op condition))
+	(when (not (typep val (parm-type parm)))
+	  (warn "Rule ~A: Illegal value (~A) in ~A: ~A"
+		rule-num val kind condition))))))
 
 ;;; Interacting with the client
 
@@ -590,12 +605,11 @@ what we are trying to find out, and what we can conclude."
 
 ;;; MYCIN: A Medical Expert System
 
-
 (defun mycin ()
   "Determine what organism is infecting a patient"
   (emycin (defcontext patient (name sex age) ())
 	  (defcontext culture (site days-old) ())
-	  (defcintext organism () (identity))))
+	  (defcontext organism () (identity))))
 
 ;; Parameters for patients
 
