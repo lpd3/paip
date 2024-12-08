@@ -461,4 +461,6 @@
      :starts-with))
 
 (defpackage #:expert
-  (:use :cl))
+  (:use :cl)
+  (:import-from :alexandria
+   :named-lambda))
