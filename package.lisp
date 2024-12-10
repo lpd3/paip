@@ -1,9 +1,13 @@
 ;;; paip/package.lisp
+
+(defpackage #:paip-utils
+  (:use :cl)
+  (:export :trace-all))
                     
 (defpackage #:02-simple-program
   (:use :cl)
   (:import-from :alexandria
-     :mappend))
+   :mappend))
 
 (defpackage #:lisp-overview
   (:use :cl)
@@ -150,7 +154,8 @@
    :d
    :simp-fn
    :find-anywhere
-   :expp))
+   :expp
+   :partition-if))
 
 (defpackage #:efficiency
   (:use :cl)
@@ -463,4 +468,6 @@
 (defpackage #:expert
   (:use :cl)
   (:import-from :alexandria
-   :named-lambda))
+   :named-lambda)
+  (:import-from :symbolic
+   :partition-if))

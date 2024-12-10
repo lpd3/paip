@@ -13,6 +13,7 @@
                "repl-utilities")
   :serial t
   :components ((:file "package")
+	       (:file "utils")
                (:file "ch-02")
                (:file "ch-03")
                (:file "ch-04")
@@ -32,6 +33,7 @@
                (:file "ch-14b")
                (:file "ch-14c")
                (:file "ch-15")
-               (:file "ch-16")))
+               (:file "ch-16")
+	       (:file "ch-16a")))
               
               

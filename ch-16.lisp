@@ -228,13 +228,12 @@ the rule-base alone.
    types UNKNOWN (return nil)
    or a valid reply (return
    t)."
-  (unless
-   (get-db
-     `(asked ,parm ,inst) t)
-   (loop
-    (let
-     ((ans 
-       (prompt-and-read-vals 
+  (unless (get-db `(asked ,parm ,inst))
+    (put-db `(asked ,parm ,inst) t)
+    (loop
+      (let
+        ((ans 
+         (prompt-and-read-vals 
          parm 
          inst)))
      (case ans
@@ -317,7 +316,7 @@ the rule-base alone.
 	   reply)))
     (when 
       (every 
-       #'(named-lambda
+        (named-lambda
 	   check-reply-1
 	   (pair)
           (and 
@@ -353,18 +352,12 @@ the rule-base alone.
              (rest2
 	      reply))))))
 
-
-(eval-when
-    (:compile-toplevel
-     :load-toplevel
-     :execute)
-  
-  (defun rest2 (lst)
-    "Given a list, return a
+(defun rest2 (lst)
+  "Given a list, return a
      list with the first two
      items in the input re-
      moved."
-    (nthcdr 2 lst)))
+  (nthcdr 2 lst))
           
 (defstruct (parm 
       (:constructor
@@ -754,6 +747,13 @@ rameter's values.
        'initial)
       (mapc
        #'find-out
+       (context-initial-data
+	context))
+      (put-db
+       'current-rule
+       'goal)
+      (mapc
+       #'find-out
        (context-goals
 	context))
       (report-findings
@@ -816,59 +816,55 @@ rameter's values.
        :conclusions
        ',conclusions))))
 
-(eval-when
-    (:compile-toplevel
-     :load-toplevel
-     :execute)
-  (defun check-conditions
-      (rule-num
-       conditions
-       kind)
-    "Warn if any conditions
+(defun check-conditions
+    (rule-num
+     conditions
+     kind)
+  "Warn if any conditions
      are invalid."
-    (when (null conditions)
-      (warn
-       "Rule ~A: Missing ~A"
-       rule-num kind))
-    (dolist
+  (when (null conditions)
+    (warn
+     "Rule ~A: Missing ~A"
+     rule-num kind))
+  (dolist
       (condition conditions)
+    (when
+	(not
+	 (consp condition))
+      (warn
+       "Rule ~A: Illegal ~A: ~A"
+       rule-num
+       kind
+       condition))
+    (multiple-value-bind
+	  (parm inst op val)
+	(parse-condition
+	 condition)
+      (declare (ignore
+		inst))
+      (when
+	  (and
+	   (eq kind
+	       'conclusion)
+	   (not
+	    (eq op 'is)))
+	(warn
+	 "Rule ~A: Illegal operator (~A) in conclusion: ~A"
+	 rule-num
+	 op
+	 condition))
       (when
 	  (not
-	   (consp condition))
+	   (typep
+	    val
+	    (parm-type
+	     parm)))
 	(warn
-	 "Rule ~A: Illegal ~A: ~A"
+	 "Rule ~A: Illegal value (~A) in ~A: ~A"
 	 rule-num
+	 val
 	 kind
-	 condition))
-      (multiple-value-bind
-	  (parm inst op val)
-	  (parse-condition
-	   condition)
-	(declare (ignore
-		  inst))
-	(when
-	    (and
-	     (eq kind
-		 'conclusion)
-	     (not
-	      (eq op 'is)))
-	  (warn
-	   "Rule ~A: Illegal operator (~A) in conclusion: ~A"
-	   rule-num
-	   op
-	   condition))
-	(when
-	    (not
-	     (typep
-	      val
-	      (parm-type
-	       parm)))
-	  (warn
-	   "Rule ~A: Illegal value (~A) in ~A: ~A"
-	   rule-num
-	   val
-	   kind
-	   condition))))))
+	 condition)))))
 
 ;;; Interacting with the cli-
 ;;; ent
@@ -899,7 +895,7 @@ rameter's values.
 	(if values
 	    (format
 	     t
-	     "~& ~A: ~{~{ ~A (~.3F) ~}~}"
+	     "~& ~A: ~{~{ ~A (~,3F) ~}~}"
 	     goal
 	     (sort
 	      (copy-list
@@ -928,10 +924,10 @@ rameter's values.
    stream
    "~&Then ~A (~A) that"
    (cf->english
-    (rule-conclusion rule)
-    stream))
+    (rule-cf rule))
+   (rule-cf rule))
   (print-conditions
-   (rule-conclusion
+   (rule-conclusions
     rule)
    stream))
 
@@ -953,7 +949,7 @@ rameter's values.
    in pseudo-English"
   (format
    stream
-   "~A    ~D)~{ ~A ~}"
+   "~&    ~D)~{ ~A ~}"
    number
    (let ((parm
 	   (first condition))
@@ -1026,7 +1022,7 @@ rameter's values.
    (multiple-value-bind
      (knowns unknowns)
        (partition-if
-	#'(named-lambda
+	 (named-lambda
 	      print-why-1
 	      (premise)
 	   (true-p
@@ -1049,149 +1045,69 @@ rameter's values.
 	 new-rule)
 	unknowns)
       (print new-rule)))))
-  
-  
 
-;;; MYCIN: A Medical Expert
-;;; System
+#| Functions
 
-(defun mycin ()
-  "Determine what organism
-   is infecting a patient"
-  (emycin
-   (list
-    (defcontext
-	patient
-	(name sex age) ())
-    (defcontext
-	culture
-	(site days-old) ())
-    (defcontext
-	organism
-	() (identity)))))
-
-;; Parameters for patients
-
-(defparm name patient t
-  "Patient's name: "
-  t read-line)
-
-(defparm sex patient
-  (member male female)
-  "Sex: "  t)
-
-(defparm age patient number
-  "Age: " t)
-
-(defparm burn patient
-  (member no mild serious)
-  "Is ~A a burn patient? If so, mild or serious?" t)
-
-(defparm compromised-host
-  patient yes/no
-  "Is ~A a compromised host?")
-
-;; Parameters for culture
-
-(defparm site culture
-  (member blood)
-  "From what site was the culture for ~A taken?" t)
-
-(defparm days-old culture
-  number
-  "How many days ago was this culture (~A) obtained?" t)
-
-;; Parameters for organism
-
-(defparm identity organism
-  (member
-   pseudomonas
-   klebsiella
-   enterobacteriaceae
-   staphylococcus
-   bacteroides
-   streptococcus)
-  "Enter the identity (genus) of ~A" t)
-
-(defparm gram organism
-  (member acid-fast pos neg)
-  "The gram stain of ~A:" t)
-
-(defparm morphology organism
-  (member rod coccus)
-  "Is ~A a rod or coccus (etc.):")
-
-(defparm aerobicity organism
-  (member aerobic
-	  anaerobic))
-
-(defparmgrowth-conformation
-    organism
-    (member chains pairs
-	    clumps))
-
-(clear-rules)
-
-(defrule 52
-  if (site culture is
-	   blood)
-     (gram organism is neg)
-     (morphology organism
-		 is rod)
-      (burn patient is
-	serious)
-  then .4
-  (identity organism is
-	    pseudomonas))
-
-(defrule 71
-  if (gram organism is pos)
-  (morphology organism
-	      is coccus)
-  (growth-comformation
-   organism is clumps)
-  then .7
-  (identity organism is
-	    staphylococcus))
-
-(defrule 73
-  if (site culture is blood)
-     (gram organism is neg)
-  (morphology organism
-	      is rod)
-  (aerobicity organism
-	      is anaerobic)
-  then .9
-  (identity organism is
-	    bacteroides))
-
-(defrule 75
-  if (gram organism is neg)
-  (morphology organism
-	      is rod)
-  (compromised-host
-   patient is yes)
-  then .6
-  (identity organism is
-	    pseudomonas))
-
-(defrule 107
-  if (gram organism is neg)
-  (morphology organism
-	      is rod)
-     (aerobicity organism is aerobic)
-  then .8
-  (identity organism is
-       enterobacteriaceae))
-
-(defrule 165
-  if (gram organism is pos)
-  (morphology organism
-	      is coccus)
-  (growth-conformation
-   organism is chains)
-  then .7
-  (identity organism is
-	    streptococcus))
-
-
+cf-or
+cf-and
+true-p
+false-p
+cf-p
+get-db
+put-db
+clear-db
+get-vals
+get-cf
+update-cf
+ask-vals
+prompt-and-read-vals
+inst-name
+check-reply
+parse-reply
+rest2
+parm-p
+new-parm
+parm-name
+parm-context
+parm-type-restriction
+parm-prompt
+parm-ask-first
+parm-reader
+parm-type
+get-parm
+context-p
+context-name
+make-context
+context-number
+context-initial-data
+context-goals
+new-instance
+make-rule
+rule-p
+rule-number
+rule-premises
+rule-conclusions
+rule-cf
+put-rule
+get-rules
+clear-rules
+find-out
+use-rules
+use-rule
+satisfy-premises
+eval-condition
+reject-premise
+conclude
+is
+parse-condition
+emycin
+get-context-data
+check-conditions
+report-findings
+print-rule
+print-conditions
+print-condition
+cf->english
+print-why
+mycin
+|#
