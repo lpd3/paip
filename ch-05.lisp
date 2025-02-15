@@ -595,7 +595,7 @@ Test and debug your new rule set. |#
         (return-from chinese-eliza 'bài!))
        (t
         (write
-         '(Wǒ bù míngbái : Qǐng jiāng shūrù
+         '(Wǒ bù míngbái \: Qǐng jiāng shūrù
            fàng zài guāhào huò shūrù quit)
          :stream *query-io*
          :pretty t
@@ -628,14 +628,14 @@ Test and debug your new rule set. |#
 
 (defparameter *chinese-eliza-rules*
   '((((?* ?x) nǐ hǎo (?* y*))
-     (nǐ hǎo : qǐng shuōmíng nǐ de wèntí))
+     (nǐ hǎo \: qǐng shuōmíng nǐ de wèntí))
     (((?* x?) wǒ xiǎng (?* ?y))
-     (rúguǒ nǐ dédào ?y : zhè duì nǐ
+     (rúguǒ nǐ dédào ?y \: zhè duì nǐ
        yìwèizhe shénme ?)
      (nǐ wèishéme xiǎng yào ?y ?)
      (jiǎshè nǐ hěn kuài dédào ?y))
     (((?* ?x) rúguǒ (?* ?y))
-     (Nín rènwéi ?y : Zhēn de yǒu 
+     (Nín rènwéi ?y \: Zhēn de yǒu 
        kěnéng ma ?)
      (Nǐ xīwàng ?y ma ?)
      (Nǐ duì ?y yǒu shé me kànfǎ ?)
@@ -651,7 +651,7 @@ Test and debug your new rule set. |#
      (Nǐ wèishéme xiànzài gàosù wǒ nǐ 
        shì ?y ?))
     (((?* ?x) Wǒ gǎnjué (?* ?y))
-     (nǐ gǎnjué ?y : Nǐ jīngcháng zhèyàng 
+     (nǐ gǎnjué ?y \: Nǐ jīngcháng zhèyàng 
          zuò ma ?))
     (((?* ?x) Wǒ (?* ?z)
              gǎnshòu (?* ?y))

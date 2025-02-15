@@ -48,6 +48,9 @@
   patient yes/no
   "Is ~A a compromised host?")
 
+(defparm wbc patient number
+  "What is ~A's white blood cell count?")
+
 ;; Parameters for culture
 
 (defparm site culture
@@ -89,13 +92,25 @@
 
 (clear-rules)
 
+(defrule 1
+  if (immunosuppressed patient is yes)
+  then 1.0 (compromised-host patient is yes))
+
+(defrule 2
+  if (leukopenia patient is yes)
+  then 1.0 (immunosuppressed patient is yes))
+
+(defrule 3
+  if (wbc patient < 2.5)
+  then .9 (leukopenia patient is yes))
+
 (defrule 52
   if (site culture is
 	   blood)
-     (gram organism is neg)
-     (morphology organism
-		 is rod)
-      (burn patient is
+  (gram organism is neg)
+  (morphology organism
+	      is rod)
+  (burn patient is
 	serious)
   then .4
   (identity organism is
