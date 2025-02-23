@@ -471,3 +471,6 @@
    :named-lambda)
   (:import-from :symbolic
    :partition-if))
+
+(defpackage #:constraint-satisfaction
+  (:use :cl))

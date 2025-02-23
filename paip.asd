@@ -34,6 +34,7 @@
                (:file "ch-14c")
                (:file "ch-15")
                (:file "ch-16")
-	       (:file "ch-16a")))
+	       (:file "ch-16a")
+               (:file "ch-17")))
               
               
