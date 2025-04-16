@@ -25,6 +25,7 @@
    :dbg-indent
    :debug*
    :find-all
+   :find-all-if
    :starts-with
    :undebug*))
 
@@ -473,4 +474,6 @@
    :partition-if))
 
 (defpackage #:constraint-satisfaction
-  (:use :cl))
+  (:use :cl)
+  (:import-from :general-problem-solver
+     :find-all-if))
