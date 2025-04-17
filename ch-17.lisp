@@ -228,7 +228,6 @@ L: equivalent to an arrow traveling toward the vertex
   ;; Return nil only when the cobstraints lead to an impossibility.
   (let ((old-num (number-of-labelings vertex)))
     (setf (vertex-labelings vertex) (consistent-labelings vertex))
-    (every #'propagate-constraints (vertex-neighbors vertex))
     (unless (impossible-vertex-p vertex)
       (when (< (number-of-labelings vertex) old-num)
         (every #'propagate-constraints (vertex-neighbors vertex)))
@@ -274,10 +273,10 @@ L: equivalent to an arrow traveling toward the vertex
              (let* ((diagram2 (make-copy-diagram diagram))
                     (v2 (find-vertex (vertex-name v) diagram2)))
                (setf (vertex-labelings v2) (list v-labeling))
-               (if (propate-constraints v2)
+               (if (propagate-constraints v2)
                    (search-solutions diagram2)
                    nil)))
-         (vetex-labelings v)))))
+         (vertex-labelings v)))))
 
 ;; Some auxiliary functions
 
@@ -300,13 +299,13 @@ L: equivalent to an arrow traveling toward the vertex
 (defun print-vertex (vertex stream depth)
   "Print a vertex in the short form."
   (declare (ignore depth))
-  (format stream "-a/~d" (vertex-name vertex)
+  (format stream "~a/~d" (vertex-name vertex)
           (number-of-labelings vertex))
   vertex)
 
-(defun show-vertex (vertex stream depth)
+(defun show-vertex (vertex &optional (stream t))
   "Print a vertex in a long form, on a new line."
-  (format stream "~&   ~a ~d:" (vertex-type vertex)
+  (format stream "~&   ~a ~d:" vertex (vertex-type vertex)
           (mapc #'(lambda (neighbor labels)
                     (format stream " ~a~a=[~{~a~}]" (vertex-name vertex)
                             (vertex-name neighbor) labels))
@@ -322,7 +321,7 @@ L: equivalent to an arrow traveling toward the vertex
   (let ((n (reduce #'* (mapcar #'number-of-labelings
                                (diagram-vertexes diagram)))))
     (when (> n 1)
-      (format stream "~&For ~d: interpretation~:p." n))))
+      (format stream "~&For ~:d interpretation~:p." n))))
 
 ;; Now, a function to transpose a matrix
 
@@ -350,7 +349,11 @@ L: equivalent to an arrow traveling toward the vertex
   (defun put-diagram (name diagram)
     "Store a diagram under a name."
     (setf (gethash name diagrams) diagram)
-    name))
+    name)
+
+  (defun query-diagram (name)
+    (gethash name diagrams)))
+
 
 (defun construct-diagram (vertex-descriptors)
   "Build a new diagram from a set of vertex-descriptors."
@@ -376,7 +379,7 @@ L: equivalent to an arrow traveling toward the vertex
 
 (defun v-d-neighbors (vertex-descriptor)
   "The neighboring vertex names in a vertex descriptor."
-  (rest (rest vertex-descriptor)))
+  (rest (rest vertex-descriptor)))6
 
 ;; The DEFSTRUCT macro automatically creates a function called COPY-<struct-type-name>.
 ;; However, this function makes shallow copies. We need a function that returns a deep
@@ -385,6 +388,7 @@ L: equivalent to an arrow traveling toward the vertex
 (defun make-copy-diagram (diagram)
   "Make a copy of the diagram, preserving connectivity."
   (let* ((new (make-diagram
+               :vertexes
                (mapcar #'copy-vertex
                        (diagram-vertexes diagram)))))
     ;; Put in the neighbors for each vertex.
@@ -392,4 +396,341 @@ L: equivalent to an arrow traveling toward the vertex
       (setf (vertex-neighbors v)
             (mapcar #'(lambda (neighbor)
                         (find-vertex (vertex-name neighbor) new))
-                    (vertex-neighbors v))))))
+                    (vertex-neighbors v))))
+    new))
+
+(defdiagram cube
+  (a Y b c d)
+  (b W g e a)
+  (c W e f a)
+  (d W f g a)
+  (e L c b)
+  (f L d c)
+  (g L b d))
+
+#| 
+CONSTRAINT-SATISFACTION> (print-labelings (diagram 'cube))
+The iniial diagram is: AB=[+-L-R] AC=[+-RL-] AD=[+--RL]
+   A/5 Y: BG=[L-+] BE=[R-+] BA=[++-]
+   B/3 W: CE=[L-+] CF=[R-+] CA=[++-]
+   C/3 W: DF=[L-+] DG=[R-+] DA=[++-]
+   D/3 W: EC=[RL+L-R] EB=[LRR+L-]
+   E/6 L: FD=[RL+L-R] FC=[LRR+L-]
+   F/6 L: GB=[RL+L-R] GD=[LRR+L-]
+   G/6 L:
+For 29,160 interpretations.
+
+After constraint propagation the diagram is: AB=[+] AC=[+] AD=[+]
+   A/1 Y: BG=[L-] BE=[R-] BA=[++]
+   B/2 W: CE=[L-] CF=[R-] CA=[++]
+   C/2 W: DF=[L-] DG=[R-] DA=[++]
+   D/2 W: EC=[R-R] EB=[LL-]
+   E/3 L: FD=[R-R] FC=[LL-]
+   F/3 L: GB=[R-R] GD=[LL-]
+   G/3 L:
+For 216 interpretations.
+
+There are four solutions:
+
+Diagram: AB=[+] AC=[+] AD=[+]
+   A/1 Y: BG=[L] BE=[R] BA=[+]
+   B/1 W: CE=[L] CF=[R] CA=[+]
+   C/1 W: DF=[L] DG=[R] DA=[+]
+   D/1 W: EC=[R] EB=[L]
+   E/1 L: FD=[R] FC=[L]
+   F/1 L: GB=[R] GD=[L]
+   G/1 L:
+
+Diagram: AB=[+] AC=[+] AD=[+]
+   A/1 Y: BG=[L] BE=[R] BA=[+]
+   B/1 W: CE=[L] CF=[R] CA=[+]
+   C/1 W: DF=[-] DG=[-] DA=[+]
+   D/1 W: EC=[R] EB=[L]
+   E/1 L: FD=[-] FC=[L]
+   F/1 L: GB=[R] GD=[-]
+   G/1 L:
+
+Diagram: AB=[+] AC=[+] AD=[+]
+   A/1 Y: BG=[L] BE=[R] BA=[+]
+   B/1 W: CE=[-] CF=[-] CA=[+]
+   C/1 W: DF=[L] DG=[R] DA=[+]
+   D/1 W: EC=[-] EB=[L]
+   E/1 L: FD=[R] FC=[-]
+   F/1 L: GB=[R] GD=[L]
+   G/1 L:
+
+Diagram: AB=[+] AC=[+] AD=[+]
+   A/1 Y: BG=[-] BE=[-] BA=[+]
+   B/1 W: CE=[L] CF=[R] CA=[+]
+   C/1 W: DF=[L] DG=[R] DA=[+]
+   D/1 W: EC=[R] EB=[-]
+   E/1 L: FD=[R] FC=[L]
+   F/1 L: GB=[-] GD=[L]
+   G/1 L:
+; No value
+
+Running (print-labelings (diagram 'cube))
+returns four solutions, corresponding to the four
+ways that the cube labelings, which are two-dimensional
+projections of a possible 3-dimensional object, could be
+physically interpreted. These are:
+
+1. A cube that is free-floating
+2. A cube that is attached to the floor
+3. A cube that is attached to a wall on the right
+4. A cube that is attached to a wall on the left
+
+We can narrow the possibilities by choosing a 
+position. |#
+
+(defun ground (diagram vertex-a vertex-b)
+  "Attach the line between the two vertexes to the ground.
+  That is, label the line with a -"
+  (let* ((a (find-vertex vertex-a diagram))
+         (b (find-vertex vertex-b diagram))
+         (i (position b (vertex-neighbors a))))
+    (assert (not (null i)))
+    (setf (vertex-labelings a)
+          (find-all-if #'(lambda (l) (eq (nth i l) '-))
+                       (vertex-labelings a)))
+    diagram))
+
+#|
+CONSTRAINT-SATISFACTION> (print-labelings (ground (diagram 'cube) 'g 'd))
+The iniial diagram is: AB=[+-L-R] AC=[+-RL-] AD=[+--RL]
+   A/5 Y: BG=[L-+] BE=[R-+] BA=[++-]
+   B/3 W: CE=[L-+] CF=[R-+] CA=[++-]
+   C/3 W: DF=[L-+] DG=[R-+] DA=[++-]
+   D/3 W: EC=[RL+L-R] EB=[LRR+L-]
+   E/6 L: FD=[RL+L-R] FC=[LRR+L-]
+   F/6 L: GB=[R] GD=[-]
+   G/1 L:
+For 4,860 interpretations.
+
+After constraint propagation the diagram is: AB=[+] AC=[+] AD=[+]
+   A/1 Y: BG=[L] BE=[R] BA=[+]
+   B/1 W: CE=[L] CF=[R] CA=[+]
+   C/1 W: DF=[-] DG=[-] DA=[+]
+   D/1 W: EC=[R] EB=[L]
+   E/1 L: FD=[-] FC=[L]
+   F/1 L: GB=[R] GD=[-]
+   G/1 L:
+; No value
+
+It works. Now, we make something more complex:
+a cube on a plate. We still need to `ground` it.
+|#
+
+(defdiagram cube-on-plate
+  (a Y b c d)
+  (b W g e a)
+  (c W e f a)
+  (d W f g a)
+  (e L c b)
+  (f Y d c i)
+  (g Y b d h)
+  (h W l g j)
+  (i W f m j)
+  (j Y h i k)
+  (k W m l j)
+  (l L h k)
+  (m L k i))
+
+#|
+CONSTRAINT-SATISFACTION> (print-labelings (ground (diagram 'cube-on-plate) 'k 'm))
+The iniial diagram is: AB=[+-L-R] AC=[+-RL-] AD=[+--RL]
+   A/5 Y: BG=[L-+] BE=[R-+] BA=[++-]
+   B/3 W: CE=[L-+] CF=[R-+] CA=[++-]
+   C/3 W: DF=[L-+] DG=[R-+] DA=[++-]
+   D/3 W: EC=[RL+L-R] EB=[LRR+L-]
+   E/6 L: FD=[+-L-R] FC=[+-RL-] FI=[+--RL]
+   F/5 Y: GB=[+-L-R] GD=[+-RL-] GH=[+--RL]
+   G/5 Y: HL=[L-+] HG=[R-+] HJ=[++-]
+   H/3 W: IF=[L-+] IM=[R-+] IJ=[++-]
+   I/3 W: JH=[+-L-R] JI=[+-RL-] JK=[+--RL]
+   J/5 Y: KM=[-] KL=[-] KJ=[+]
+   K/1 W: LH=[RL+L-R] LK=[LRR+L-]
+   L/6 L: MK=[RL+L-R] MI=[LRR+L-]
+   M/6 L:
+For 32,805,000 interpretations.
+
+After constraint propagation the diagram is: AB=[+] AC=[+] AD=[+]
+   A/1 Y: BG=[L] BE=[R] BA=[+]
+   B/1 W: CE=[L] CF=[R] CA=[+]
+   C/1 W: DF=[-] DG=[-] DA=[+]
+   D/1 W: EC=[R] EB=[L]
+   E/1 L: FD=[-] FC=[L] FI=[R]
+   F/1 Y: GB=[R] GD=[-] GH=[L]
+   G/1 Y: HL=[L] HG=[R] HJ=[+]
+   H/1 W: IF=[L] IM=[R] IJ=[+]
+   I/1 W: JH=[+] JI=[+] JK=[+]
+   J/1 Y: KM=[-] KL=[-] KJ=[+]
+   K/1 W: LH=[R] LK=[-]
+   L/1 L: MK=[-] MI=[L]
+   M/1 L:
+; No value
+
+It works. What happens if we give it an `impossible` figure?
+|#
+(defdiagram poiuyt
+  (a L b g)
+  (b L j a)
+  (c L d l)
+  (d L h c)
+  (e L f i)
+  (f L k e)
+  (g L a l)
+  (h L l d)
+  (i L e k)
+  (j L k b)
+  (k W j i f)
+  (l W h g c))
+
+#|
+CONSTRAINT-SATISFACTION> (print-labelings (diagram 'poiuyt))
+The iniial diagram is: AB=[RL+L-R] AG=[LRR+L-]
+   A/6 L: BJ=[RL+L-R] BA=[LRR+L-]
+   B/6 L: CD=[RL+L-R] CL=[LRR+L-]
+   C/6 L: DH=[RL+L-R] DC=[LRR+L-]
+   D/6 L: EF=[RL+L-R] EI=[LRR+L-]
+   E/6 L: FK=[RL+L-R] FE=[LRR+L-]
+   F/6 L: GA=[RL+L-R] GL=[LRR+L-]
+   G/6 L: HL=[RL+L-R] HD=[LRR+L-]
+   H/6 L: IE=[RL+L-R] IK=[LRR+L-]
+   I/6 L: JK=[RL+L-R] JB=[LRR+L-]
+   J/6 L: KJ=[L-+] KI=[R-+] KF=[++-]
+   K/3 W: LH=[L-+] LG=[R-+] LC=[++-]
+   L/3 W:
+For 544,195,584 interpretations.
+
+After constraint propagation the diagram is: AB=[RL+-R] AG=[LRRL-]
+   A/5 L: BJ=[RLL-R] BA=[LR+L-]
+   B/5 L: CD=[LR] CL=[+-]
+   C/2 L: DH=[RL-] DC=[LRL]
+   D/3 L: EF=[RLR] EI=[LR-]
+   E/3 L: FK=[+-] FE=[RL]
+   F/2 L: GA=[RL-R] GL=[L+L-]
+   G/4 L: HL=[R+-R] HD=[LRL-]
+   H/4 L: IE=[RL-R] IK=[L+L-]
+   I/4 L: JK=[R+-R] JB=[LRL-]
+   J/4 L: KJ=[L-+] KI=[R-+] KF=[++-]
+   K/3 W: LH=[L-+] LG=[R-+] LC=[++-]
+   L/3 W:
+For 2,073,600 interpretations.
+
+There are zero solutions:
+; No value
+
+It correctly spotted our ruse.
+
+How about a much more complex (possible) diagram, which we
+will call a `tower`?
+|#
+
+(defdiagram tower
+  (a Y b c d)
+  (b W g e a)
+  (c W e f a)
+  (d W f g a)
+  (e L c b)
+  (f Y d c i)
+  (g Y b d h)
+  (h W l g j)
+  (i W f m p)
+  (j Y h o k)
+  (k W m l j)
+  (l L h k)
+  (m L k i)
+  (n L q o)
+  (o W y j n)
+  (p L r i)
+  (q W n s w)
+  (r W s p x)
+  (s L r q)
+  (t W w x z)
+  (u W x y z)
+  (v W y w z)
+  (w Y t v q)
+  (x Y r u t)
+  (y Y v u o)
+  (z Y t u v))
+
+#|
+CONSTRAINT-SATISFACTION> (print-labelings (ground (diagram 'tower) 'l 'k))
+The iniial diagram is: AB=[+-L-R] AC=[+-RL-] AD=[+--RL]
+   A/5 Y: BG=[L-+] BE=[R-+] BA=[++-]
+   B/3 W: CE=[L-+] CF=[R-+] CA=[++-]
+   C/3 W: DF=[L-+] DG=[R-+] DA=[++-]
+   D/3 W: EC=[RL+L-R] EB=[LRR+L-]
+   E/6 L: FD=[+-L-R] FC=[+-RL-] FI=[+--RL]
+   F/5 Y: GB=[+-L-R] GD=[+-RL-] GH=[+--RL]
+   G/5 Y: HL=[L-+] HG=[R-+] HJ=[++-]
+   H/3 W: IF=[L-+] IM=[R-+] IP=[++-]
+   I/3 W: JH=[+-L-R] JO=[+-RL-] JK=[+--RL]
+   J/5 Y: KM=[L-+] KL=[R-+] KJ=[++-]
+   K/3 W: LH=[R] LK=[-]
+   L/1 L: MK=[RL+L-R] MI=[LRR+L-]
+   M/6 L: NQ=[RL+L-R] NO=[LRR+L-]
+   N/6 L: OY=[L-+] OJ=[R-+] ON=[++-]
+   O/3 W: PR=[RL+L-R] PI=[LRR+L-]
+   P/6 L: QN=[L-+] QS=[R-+] QW=[++-]
+   Q/3 W: RS=[L-+] RP=[R-+] RX=[++-]
+   R/3 W: SR=[RL+L-R] SQ=[LRR+L-]
+   S/6 L: TW=[L-+] TX=[R-+] TZ=[++-]
+   T/3 W: UX=[L-+] UY=[R-+] UZ=[++-]
+   U/3 W: VY=[L-+] VW=[R-+] VZ=[++-]
+   V/3 W: WT=[+-L-R] WV=[+-RL-] WQ=[+--RL]
+   W/5 Y: XR=[+-L-R] XU=[+-RL-] XT=[+--RL]
+   X/5 Y: YV=[+-L-R] YU=[+-RL-] YO=[+--RL]
+   Y/5 Y: ZT=[+-L-R] ZU=[+-RL-] ZV=[+--RL]
+   Z/5 Y:
+For 1,614,252,037,500,000 interpretations.
+
+After constraint propagation the diagram is: AB=[+] AC=[+] AD=[+]
+   A/1 Y: BG=[L] BE=[R] BA=[+]
+   B/1 W: CE=[L] CF=[R] CA=[+]
+   C/1 W: DF=[-] DG=[-] DA=[+]
+   D/1 W: EC=[R] EB=[L]
+   E/1 L: FD=[-] FC=[L] FI=[R]
+   F/1 Y: GB=[R] GD=[-] GH=[L]
+   G/1 Y: HL=[L] HG=[R] HJ=[+]
+   H/1 W: IF=[L] IM=[R] IP=[+]
+   I/1 W: JH=[+] JO=[+] JK=[+]
+   J/1 Y: KM=[-] KL=[-] KJ=[+]
+   K/1 W: LH=[R] LK=[-]
+   L/1 L: MK=[-] MI=[L]
+   M/1 L: NQ=[R] NO=[-]
+   N/1 L: OY=[+] OJ=[+] ON=[-]
+   O/1 W: PR=[L] PI=[+]
+   P/1 L: QN=[L] QS=[R] QW=[+]
+   Q/1 W: RS=[L] RP=[R] RX=[+]
+   R/1 W: SR=[R] SQ=[L]
+   S/1 L: TW=[+] TX=[+] TZ=[-]
+   T/1 W: UX=[+] UY=[+] UZ=[-]
+   U/1 W: VY=[+] VW=[+] VZ=[-]
+   V/1 W: WT=[+] WV=[+] WQ=[+]
+   W/1 Y: XR=[+] XU=[+] XT=[+]
+   X/1 Y: YV=[+] YU=[+] YO=[+]
+   Y/1 Y: ZT=[-] ZU=[-] ZV=[-]
+   Z/1 Y:
+; No value
+
+Think of it: the number of initial combinations
+of vertex types if over 1 quadrillion. Yet the
+constraint propagation technique narrows all of
+these down to one single possible interpretaion
+in a split second.
+
+Most of the time is spent printing. So, to get
+an idea of the speed of the processing, we 
+write a function that returns solutions without
+explicit printing. 
+|#
+
+(defun find-labelings (diagram)
+  "Return a list of all consistent labelings of the diagram."
+  (every #'propagate-constraints (diagram-vertexes diagram))
+  (search-solutions diagram))
+
+;; It turns out that the impossible figure takes longer to calculate than the
+;; tower.

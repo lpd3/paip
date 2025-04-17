@@ -1005,44 +1005,4 @@ this problem. |#
        :del-list '(hungry-for-dessert
                    have-cake))))  
                                  
-;; I cannot get these ops to misbehave.        
-              
-         
-    
-                 
-
-                
-  
- 
-
-
-  
-                
-    
-
-   
-
-          
-
-
-
-
-
-    
-    
-   
-
-  
-
-   
-
-
-
-    
-     
-                 
-     
-
-
-  
-             
+;; I cannot get these ops to misbehave.
